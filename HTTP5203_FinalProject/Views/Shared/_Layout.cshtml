@@ -1,0 +1,32 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title - XML Final Project</title>
+    <link href="~/Content/Site.css" rel="stylesheet" type="text/css" />
+    <link href="~/Content/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <script src="~/Scripts/modernizr-2.8.3.js"></script>
+    <script src="~/Scripts/jquery-3.1.1.min.js"></script>
+</head>
+<body>
+    <div class="body-content">
+        <header>
+            <h1>
+                @Html.ActionLink("Barrières à Toronto", "Index", null, htmlAttributes: new { @class = "main-header" })
+            </h1>
+            @Html.ActionLink("About", "About", null, htmlAttributes: new { @class = "btn btn-default" })
+        </header>
+
+        @RenderBody()
+        <hr />
+        <footer>
+            <p>Copyright &copy; @DateTime.Now.Year - Barrières à Toronto (XML Final Project)</p>
+            <p>Google Maps JavaScript API | Google Places API Web Service | Google Maps Directions API | Google Maps Distance Matrix API | Google Maps Geolocation API</p>
+            <p>Open Weather Map API | Road Restrictions Open Data</p>
+        </footer>
+    </div>
+
+    <script src="~/Scripts/bootstrap.min.js"></script>
+</body>
+</html>

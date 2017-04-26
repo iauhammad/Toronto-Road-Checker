@@ -1,0 +1,664 @@
+﻿
+@{
+    ViewBag.Title = "Barrières à Toronto";
+}
+@using HTTP5203_FinalProject.Models;
+
+<div>
+    <div class="row main-content">
+        <!-- Main Section to show Google Map class="container-fluid" -->
+        <!-- ------------------------------- -->
+        <div class="col-sm-9">
+            <main><div id="map"></div></main>
+        </div>
+        
+        <!-- Left Side Bar to provide configurations menu -->
+        <!-- -------------------------------------------- -->
+        <div class="col-sm-3 side-bar">
+
+            <!-- Distance parameter to load roadblocks -->
+            <section class="side-bar__section">
+                <h2 class="side-bar__headers">View Roadblocks Within</h2>
+                <div class="side-bar__section-body">
+                    @Html.DropDownList("paramRoadblockDistance", ViewBag.RoadblockDistance as IEnumerable<SelectListItem>, htmlAttributes: new { @class = "form-control input-sm custom-control" })
+                    <button type="button" class="btn btn-primary btn-sm" id="btnLoadMarkers" title="Click to view road blocks">Load Roadblocks</button>
+                </div>
+            </section>
+
+            <!-- Weather forecast at current location -->
+            <section class="side-bar__section weather-widget" id="weatherLocation">
+                <h2 class="side-bar__headers">Currently at <span></span></h2>
+                <div class="row side-bar__section-body">
+                    <div class="col-xs-5">
+                        <div class="main-weather"></div>
+                        <div>
+                            <span class="weather-icon"></span>
+                            <span class="temperature"></span>
+                        </div>
+                    </div>
+                    <div class="col-xs-7 side-bar__info">
+                        <div>Last updated:</div>
+                        <div class="weather-time"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Search bar to set your current/destination location -->
+            <section class="side-bar__section">
+                <h2 class="side-bar__headers">Set your location 
+                    <span id="btnGeolocate" class="glyphicon glyphicon-map-marker btn-geo" title="Click to geolocate your current location"></span>
+                </h2>
+                <div class="side-bar__section-body">
+                    <input id="your-location" class="form-control input-sm" type="text" placeholder="Search your current address">
+                </div>
+                <h2 class="side-bar__headers">Going somewhere today?</h2>
+                <div class="side-bar__section-body">
+                    <input id="destination-location" class="form-control input-sm" type="text" placeholder="Search your destination address">
+                </div>
+                <div class="side-bar__section-body">
+                    <div class="radio-inline">
+                        <input type="radio" id="rbtnCar" name="travelOption" value="DRIVING" checked /><label for="rbtnCar">Driving</label>
+                    </div>
+                    <div class="radio-inline">
+                        <input type="radio" id="rbtnWalk" name="travelOption" value="WALKING" /><label for="rbtnWalk">Walking</label>
+                    </div>
+                    <div class="radio-inline">
+                        <input type="radio" id="rbtnCycle" name="travelOption" value="BICYCLING" /><label for="rbtnCycle">Cycling</label>
+                    </div>
+                    <div class="checkbox-inline">
+                        <input type="checkbox" id="chkAvoidHighways" value="true" /><label for="chkAvoidHighways">Avoid Highways</label>
+                    </div>
+                </div>
+                <div class="side-bar__section-body">
+                    <button type="button" class="btn btn-primary btn-sm" id="btnAnalyseJourney" title="Click to analyse your planned journey">Analyse Journey</button>
+                    <div id="errJourney" class="text-danger"></div>
+                </div>
+            </section>
+            
+            <!-- Weather forecast at destination location -->
+            <section class="side-bar__section weather-widget" id="weatherDestination">
+                <h2 class="side-bar__headers">Going to <span></span></h2>
+                <div class="row side-bar__section-body">
+                    <div class="col-xs-5">
+                        <div class="main-weather"></div>
+                        <div>
+                            <span class="weather-icon"></span>
+                            <span class="temperature"></span>
+                        </div>
+                    </div>
+                    <div class="col-xs-7 side-bar__info">
+                        <div>Last updated:</div>
+                        <div class="weather-time"></div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+</div>
+
+<!-- API KEY FOR FINAL PROJECT -->
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBcPeCqUyUXahetGht4K_xtbQhl1x_xVKA&callback=initializeMap&libraries=geometry,places"></script>
+<!-- BACK UP KEY IN CASE API EXCEEDS ALLOWED LIMIT -->
+@*<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCZuCgkMHOaoQzjVvGEBIUPU5JcPjrbv88&callback=initializeMap&libraries=geometry,places"></script>*@
+
+<script type="text/javascript">
+    // -- Global Variables Declaration
+    var map;
+    var directionsService;
+    var directionsDisplay;
+    var lstMarkers = [];
+    var currentLocationMarkers = [];
+    var destinationMarker = [];
+    var currentLocationPosition;
+    var destinationLocationPosition;
+    var infowindow;
+    var im = 'http://www.robotwoods.com/dev/misc/bluecircle.png';
+    var weekday = new Array(7);
+    weekday[0] = "Sunday";
+    weekday[1] = "Monday";
+    weekday[2] = "Tuesday";
+    weekday[3] = "Wednesday";
+    weekday[4] = "Thursday";
+    weekday[5] = "Friday";
+    weekday[6] = "Saturday";
+
+
+    // -- Function to initialise map
+    // -- --------------------------
+    function initializeMap() {
+
+        // -- Create Google API Objects
+        // -- -------------------------
+        directionsService = new google.maps.DirectionsService;
+        directionsDisplay = new google.maps.DirectionsRenderer;
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: { lat: 43.601526, lng: -79.5478077 },    // Load map around Etobikoke
+            zoom: 13,
+            mapTypeId: google.maps.MapTypeId.ROADMAP
+        });
+        directionsDisplay.setMap(map);
+
+
+        // -- Create the search box for current location and link it to the UI element
+        // -- ------------------------------------------------------------------------
+        var inputCurrentLocation = document.getElementById('your-location');
+        var currentLocationSearchBox = new google.maps.places.SearchBox(inputCurrentLocation);
+
+        // Bias the SearchBox results towards current map's viewport.
+        map.addListener('bounds_changed', function () {
+            currentLocationSearchBox.setBounds(map.getBounds());
+        });
+
+        // Listen for the event fired when the user selects a prediction and retrieve more details for that place.
+        currentLocationSearchBox.addListener('places_changed', function () {
+            // Clear road block markers if current location changes
+            clearAllMarkers();
+            var places = currentLocationSearchBox.getPlaces();
+
+            if (places.length == 0) {
+                return;
+            }
+
+            // Clear out the old markers.
+            currentLocationMarkers.forEach(function (marker) {
+                marker.setMap(null);
+            });
+            currentLocationMarkers = [];
+
+            // For each place, get the icon, name and location.
+            var bounds = new google.maps.LatLngBounds();
+            places.forEach(function (place) {
+                if (!place.geometry) {
+                    console.log("Returned place contains no geometry");
+                    return;
+                }
+                var icon = {
+                    url: place.icon,
+                    size: new google.maps.Size(71, 71),
+                    origin: new google.maps.Point(0, 0),
+                    anchor: new google.maps.Point(17, 34),
+                    scaledSize: new google.maps.Size(25, 25)
+                };
+
+                // Create a marker for each place.
+                currentLocationMarkers.push(new google.maps.Marker({
+                    map: map,
+                    icon: im,
+                    title: place.name,
+                    position: place.geometry.location
+                }));
+                currentLocationPosition = place.geometry.location;
+
+                if (place.geometry.viewport) {
+                    // Only geocodes have viewport.
+                    bounds.union(place.geometry.viewport);
+                } else {
+                    bounds.extend(place.geometry.location);
+                }
+            });
+
+            // Get weather information for new location
+            pGetWeatherData(currentLocationPosition.lat(), currentLocationPosition.lng(), "LOCATION");
+
+            map.fitBounds(bounds);
+        });
+
+
+        // -- Create the search box for the destination location and link it to the UI element
+        // -- --------------------------------------------------------------------------------
+        var inputDestinationLocation = document.getElementById('destination-location');
+        var destinationLocationSearchBox = new google.maps.places.SearchBox(inputDestinationLocation);
+
+        // Listen for the event fired when the user selects a destination address and calculate path
+        destinationLocationSearchBox.addListener('places_changed', function () {
+            // Clear any previously viewd markers
+            clearAllMarkers();
+
+            var places = destinationLocationSearchBox.getPlaces();
+
+            if (places.length == 0) {
+                return;
+            }
+
+            // Clear out the old markers.
+            destinationMarker.forEach(function (marker) {
+                marker.setMap(null);
+            });
+            destinationMarker = [];
+
+            // Find destination position
+            var bounds = new google.maps.LatLngBounds();
+            places.forEach(function (place) {
+                if (!place.geometry) {
+                    console.log("Returned place contains no geometry");
+                    return;
+                }
+                var icon = {
+                    url: place.icon,
+                    size: new google.maps.Size(71, 71),
+                    origin: new google.maps.Point(0, 0),
+                    anchor: new google.maps.Point(17, 34),
+                    scaledSize: new google.maps.Size(25, 25)
+                };
+
+                // Create a marker for each place.
+                destinationMarker.push(new google.maps.Marker({
+                    map: map,
+                    icon: icon,
+                    title: place.name,
+                    position: place.geometry.location
+                }));
+                destinationLocationPosition = place.geometry.location;
+
+                if (place.geometry.viewport) {
+                    // Only geocodes have viewport.
+                    bounds.union(place.geometry.viewport);
+                } else {
+                    bounds.extend(place.geometry.location);
+                }
+            });
+
+            // Get weather information for new destination
+            pGetWeatherData(destinationLocationPosition.lat(), destinationLocationPosition.lng(), "DESTINATION");
+        });
+
+
+        // -- Use HTML5 Geolocation to find user's current location
+        // -- -----------------------------------------------------
+        pGeoLocateUser();
+
+        // Load all roadblock markers
+        loadAllRoadblockMarkers();
+
+    }   // End of initializeMap() function
+
+
+    // -- Function to GeoLocate the user's current position
+    // -- -------------------------------------------------
+    function pGeoLocateUser() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                var pos = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+
+                // Clear out the old markers.
+                currentLocationMarkers.forEach(function (marker) {
+                    marker.setMap(null);
+                });
+                currentLocationMarkers = [];
+
+                // Create a marker for the location
+                var currentLocation = new google.maps.Marker({
+                    icon: im,
+                    position: pos,
+                    title: "Your Location",
+                    infowindow: new google.maps.InfoWindow({
+                        content: "Your current location detected automatically!",
+                        maxWidth: 225
+                    }),
+                    map: map
+                });
+                currentLocationMarkers.push(currentLocation);
+                google.maps.event.addListener(currentLocation, 'click', function () {
+                    this.infowindow.open(map, this);
+                });
+                currentLocationPosition = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                map.setCenter(pos);
+                map.setZoom(17);
+                map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                // Get weather information for user's current position
+                pGetWeatherData(position.coords.latitude, position.coords.longitude, "LOCATION");
+            }, function () {
+                handleLocationError(true, infowindow, map.getCenter());
+            });
+        } else {
+            // Browser doesn't support Geolocation
+            handleLocationError(false, infowindow, map.getCenter());
+        }
+    }   // End of pGeoLocateUser() function
+
+
+    // -- Function to calculate distance between two position
+    // -- ---------------------------------------------------
+    function pCalculateRoute() {
+        // -- Validate in current and destination locations are available
+        if (currentLocationPosition == null || destinationLocationPosition == null) {
+            $('#errJourney').hide();
+            $('#errJourney').html('Please provide a start and destination location');
+            $('#errJourney').slideDown('slow');
+            setTimeout(function () {
+                $('#errJourney').slideUp('slow');
+            }, 5000);
+            return;
+        }
+
+        // -- Check for travel options
+        var userTravelMode = $("input[name='travelOption']:checked").val();
+        var avoidMajorHighways = false;
+        if ($('#chkAvoidHighways').prop("checked") == true) {
+            avoidMajorHighways = true;
+        }
+
+        // -- Render route
+        directionsService.route({
+            origin: currentLocationPosition,
+            destination: destinationLocationPosition,
+            travelMode: userTravelMode,
+            avoidHighways: avoidMajorHighways
+        }, function (response, status) {
+            if (status === 'OK') {
+                directionsDisplay.setDirections(response);  // Display route on map
+                pDisplayJourneyRoadBlocks(response);    // Compute and display any roadblocks on the route
+            } else {
+                window.alert('Directions request failed due to ' + status);
+            }
+        });
+    }   // End of pCalculateRoute() function
+
+
+    // -- Function to handle Geolocation error
+    // -- ------------------------------------
+    function handleLocationError(browserHasGeolocation, infoWindowParam, pos) {
+        var sErrorMessage = browserHasGeolocation ? 'Error: The Geolocation service failed.' : 'Error: Your browser doesn\'t support geolocation.'
+        alert(sErrorMessage);
+        $('#your-location').focus();
+        //infoWindowParam: new google.maps.InfoWindow({
+        //    content: "Your current location cannot be detected!",
+        //    maxWidth: 225
+        //});
+        //infoWindowParam.setPosition(pos);
+        //infoWindowParam.setContent(browserHasGeolocation ?
+        //                        'Error: The Geolocation service failed.' :
+        //                        'Error: Your browser doesn\'t support geolocation.');
+
+    }   // end of  handleLocationError() function
+
+
+    // -- Function to load all roadblock markers in array
+    // -- -----------------------------------------------
+    function loadAllRoadblockMarkers() {
+
+        // -- Make an AJAX call to read the XML file source
+        $.getJSON('@Url.Action("AllRoadBlocks")', function (data) {
+
+            // -- Loop through data to create markers for each roadblock
+            $.each(data, function (index, objRdBlock) {
+                // Ignore expired road restrictions
+                if (objRdBlock.Expired == "0") {
+
+                    // Determine the type of marker for the road restriction (for different icons)
+                    var roadBlockIcon;
+                    switch (objRdBlock.WorkEventType) {
+                        case "Construction":
+                            roadBlockIcon = '@Url.Content("~/Images/sm_construction_icon.png")';
+                            break;
+                        case "Maintenance":
+                            roadBlockIcon = '@Url.Content("~/Images/sm_maintenance_icon.png")';
+                            break;
+                        case "Utility Cut":
+                            roadBlockIcon = '@Url.Content("~/Images/sm_maintenance_icon.png")';
+                            break;
+                        default:
+                            roadBlockIcon = '@Url.Content("~/Images/sm_roadblock_icon.png")';
+                            break;
+                    }
+
+                    // Construct the marker infowindow information
+                    var sRoadClass = "";
+                    var sClosureType = "";
+                    if (objRdBlock.RoadClass !== "") {
+                        sRoadClass = " (" + objRdBlock.RoadClass + ")";
+                    }
+                    if (objRdBlock.Planned == "1") {
+                        sClosureType = "Planned";
+                    } else {
+                        sClosureType = "Emergency";
+                    }
+
+                    var sInfoWindowContent = "";
+                    sInfoWindowContent += "<div class=\"roadblock\">";
+                    sInfoWindowContent += "     <div class=\"roadblock__title\"><strong>Roadblock on " + objRdBlock.Road + sRoadClass + "</strong></div><br />";
+                    sInfoWindowContent += "     <div class=\"roadblock__location\"><strong>Work Area:</strong> " + objRdBlock.Name + ", " + objRdBlock.District + "</div>";
+                    sInfoWindowContent += "     <div class=\"roadblock__plan\"><strong>Is it planned:</strong> " + sClosureType + "</div>";
+                    sInfoWindowContent += "     <div class=\"roadblock__period\"><strong>Work Period:</strong> " + objRdBlock.WorkPeriod + "</div>";
+                    sInfoWindowContent += "     <div class=\"roadblock_time\"><strong>Start at:</strong> " + convertTimestamp(objRdBlock.StartTime / 1000, "date") + "</div>";
+                    sInfoWindowContent += "     <div class=\"roadblock_time\"><strong>End at:</strong> " + convertTimestamp(objRdBlock.EndTime / 1000, "date") + "</div>";
+                    if (objRdBlock.Contractor != "") {
+                        sInfoWindowContent += "     <div class=\"roadblock__contractor\"><strong>Contractor:</strong> " + objRdBlock.Contractor + "</div>";
+                    }
+                    sInfoWindowContent += "     <div><strong>Description of roadblock:</strong></div>";
+                    sInfoWindowContent += "     <div class=\"roadblock__desc\">" + objRdBlock.Description + "</div>";
+                    sInfoWindowContent += "</div>";
+
+                    // Construct the marker and add to array of markers
+                    var marker = new google.maps.Marker({
+                        icon: roadBlockIcon,
+                        position: new google.maps.LatLng(objRdBlock.Latitude, objRdBlock.Longitute),
+                        title: objRdBlock.Contractor,
+                        infowindow: new google.maps.InfoWindow({
+                            content: sInfoWindowContent,
+                            maxWidth: 275
+                        }),
+                        map: null
+                    });
+                    lstMarkers.push(marker);    // Store marker in list of markers
+
+                    // Add click event to the marker to show the info window
+                    google.maps.event.addListener(marker, 'click', function () {
+                        for (var i = 0; i < lstMarkers.length; i++) {
+                            if (lstMarkers[i].infowindow) {
+                                lstMarkers[i].infowindow.close();
+                            }
+                        }
+                        this.infowindow.open(map, this);
+                    });
+
+                }
+            }); // end of loop through roadblocks
+
+        }); // end of AJAX call method
+
+    }   // end of loadAllRoadblockMarkers() function
+
+
+    // -- Function to show all markers within the specified distance from the user's location
+    // -- -----------------------------------------------------------------------------------
+    function showMarkers(map, distToDraw) {
+
+        // Declare a new bounds object
+        var bounds = new google.maps.LatLngBounds();
+
+        // Find markers within the distance requested by the user
+        for (var i = 0; i < lstMarkers.length; i++) {
+            var roadBlockPosition = lstMarkers[i].position;
+            if (distToDraw > 0) {
+                if (google.maps.geometry.spherical.computeDistanceBetween(currentLocationPosition, roadBlockPosition) <= distToDraw) {
+                    lstMarkers[i].setMap(map);
+                    bounds.extend(lstMarkers[i].position);
+                }
+            } else {
+                lstMarkers[i].setMap(map);
+                bounds.extend(lstMarkers[i].position);
+            }
+        } // end of loop through markers
+
+        // Re-adjust map's bounds
+        map.fitBounds(bounds);
+
+    }   // end of showMarkers() function
+
+
+    // -- Function to hide all markers from the map
+    // -- -----------------------------------------
+    function clearAllMarkers() {
+        for (var i = 0; i < lstMarkers.length; i++) {
+            lstMarkers[i].setMap(null);
+        }
+    }   // end of clearAllMarkers() function
+
+
+    // -- Function to show roadblocks on a specific path
+    // -- ----------------------------------------------
+    function pDisplayJourneyRoadBlocks(response) {
+
+        // Variables declaration
+        var currentRouteArray = response.routes[0];  //Returns a complex object containing the results of the current route
+        var currentRoute = currentRouteArray.overview_path; //Returns a simplified version of all the coordinates on the path
+
+        // Loop through all the coordinates on the path and verify if there is any roadblocks
+        for (var i = 0; i < currentRouteArray.overview_path.length; i++) {
+            // Create a temporary position for each Lat/Lng found on the path
+            var tempPosition = new google.maps.LatLng(currentRouteArray.overview_path[i].lat(), currentRouteArray.overview_path[i].lng());
+
+            // Loop and find if any marker is found within a distance of 150 Meters from the path
+            for (var j = 0; j < lstMarkers.length; j++) {
+                var roadBlockPosition = lstMarkers[j].position;
+                if (google.maps.geometry.spherical.computeDistanceBetween(tempPosition, roadBlockPosition) <= 200) {    // roadblocks within 200M of the road
+                    lstMarkers[j].setMap(map);
+                }
+            }
+        }
+
+    }   // end of function pDisplayJourneyRoadBlocks()
+
+
+    // -- Function to call weather API and get weather data
+    // -- -------------------------------------------------
+    function pGetWeatherData(latitude, longitude, weatherAt) {
+
+        // Variable to hold URI for API call
+        var apiUrl = "http://api.openweathermap.org/data/2.5/weather?lat=" + latitude + "&lon=" + longitude + "&APPID=de9abd0979ee77c84678f33c4a36bd52";
+
+        // Make an AJAX call to the API and display the weather data back on the front page
+        $.ajax({
+            url: apiUrl,
+            type: "GET",
+            dataType: "JSON",
+            success: function (response) {
+                // Check which widget to update
+                if (weatherAt == "LOCATION") {
+                    var widgetId = "weatherLocation";
+                } else {
+                    var widgetId = "weatherDestination";
+                }
+
+                // Construct weather data
+                var displayLocation = response.name + ", " + response.sys.country;
+                var displayTime = convertTimestamp(response.dt, "day");
+                var displayMainWeather = response.weather[0].main;
+                var displayTemp = (response.main.temp - 273.15).toFixed() + ' &#8451;';
+                var displayIcon = "<img src=\"http://openweathermap.org/img/w/" + response.weather[0].icon + ".png\" alt=\"Current weather icon\" />";
+
+                // Display the weather data on the front page
+                $('#' + widgetId + ' .side-bar__headers>span').html(displayLocation);
+                $('#' + widgetId + ' .weather-time').html(displayTime);
+                $('#' + widgetId + ' .weather-icon').html(displayIcon);
+                $('#' + widgetId + ' .main-weather').html(displayMainWeather);
+                $('#' + widgetId + ' .temperature').html(displayTemp);
+                $('#' + widgetId).slideDown('slow');
+            }
+        });
+
+    }   // end of pGetWeatherData() function
+
+
+    // -- Function to convert a UNIX timestamp to Date
+    // -- --------------------------------------------
+    function convertTimestamp(timestamp, dayOrDate) {
+        var d = new Date(timestamp * 1000),	            // Convert the passed timestamp to milliseconds
+            day = weekday[d.getDay()],
+            yyyy = d.getFullYear(),
+            mm = ('0' + (d.getMonth() + 1)).slice(-2),	// Months are zero based. Add leading 0.
+            dd = ('0' + d.getDate()).slice(-2),			// Add leading 0.
+            hh = d.getHours(),
+            h = hh,
+            min = ('0' + d.getMinutes()).slice(-2),		// Add leading 0.
+            ampm = 'AM',
+            time;
+
+        if (hh > 12) {
+            h = hh - 12;
+            ampm = 'PM';
+        } else if (hh === 12) {
+            h = 12;
+            ampm = 'PM';
+        } else if (hh == 0) {
+            h = 12;
+        }
+
+        // ie: 2013-02-18, 8:35 AM
+        if (dayOrDate == "day") {
+            time = day + ', ' + h + ':' + min + ' ' + ampm;
+        } else {
+            time = yyyy + '-' + mm + '-' + dd + ', ' + h + ':' + min + ' ' + ampm;
+        }
+
+        return time;
+    }   // end of convertTimestamp() function
+
+
+    // -- Main execution on page load
+    // -- ---------------------------
+    $(document).ready(function () {
+
+        // -- Show markers that meet with the requested criteria
+        $('#btnLoadMarkers').click(function () {
+            // Clear any direction path
+            directionsDisplay.set('directions', null);
+
+            // Clear out the old destination marker
+            destinationMarker.forEach(function (marker) {
+                marker.setMap(null);
+            });
+            destinationMarker = [];
+
+            // Empty destination search box
+            $('#destination-location').val('');
+
+            // Hide destination weather widget
+            $('#weatherDestination').slideUp('slow');
+
+            // Hide previsouly shown markers
+            clearAllMarkers();
+
+            // -- Show Roadblocks within new radius
+            var distanceParam = $('#paramRoadblockDistance').val();
+            distanceParam = (distanceParam * 1000);
+            showMarkers(map, distanceParam);
+
+        }); // end of click event on button 'Load Markers'
+
+
+        // -- Button to load direction and analyse roadblocks on that journey
+        $('#btnAnalyseJourney').click(function () {
+            // Clear roadblock markers if any
+            clearAllMarkers();
+
+            // Calculate route from location to destination
+            pCalculateRoute();
+
+        }); // end of click event on button 'Analyse Journey'
+
+
+        // -- Button to allow user to geolocate himsel/herself back again
+        $('#btnGeolocate').click(function () {
+            // Reset everything on map
+            clearAllMarkers();
+            directionsDisplay.set('directions', null);
+            destinationMarker.forEach(function (marker) {
+                marker.setMap(null);
+            });
+            $('#your-location').val('');
+            $('#destination-location').val('');
+
+            // Geolocate user
+            pGeoLocateUser();
+
+        }); // end of click event on button 'Geolocate me'
+
+    });
+
+</script>

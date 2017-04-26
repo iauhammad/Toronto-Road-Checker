@@ -1,0 +1,119 @@
+﻿
+header {
+    border-bottom: 1px solid #e1dede;
+    position: relative;
+}
+header h1, header h1>a {
+    display: inline-block;
+    font-size: 30px;
+    color: #fff;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-style: italic;
+    text-align: center;
+    letter-spacing: 1px;
+}
+header h1>a:hover {
+    text-decoration: none;
+    color: #fff;
+}
+header>a {
+    position: absolute;
+    right: 2em;
+    bottom: 0.8em;
+}
+body {
+    padding-bottom: 30px;
+    background-image: url(../Images/toronto.jpg);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    font-family: 'Verdana', sans-serif;
+}
+
+.body-content {
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+footer {
+    text-align: center;
+    background-color: rgba(114, 119, 120, 0.7);
+    padding: 12px 8px;
+    color: #fff;
+    border-radius: 5px 5px;
+}
+
+footer p {
+    margin-bottom: 0;
+}
+
+#map {
+    width: auto;
+    min-height: 515px;
+    border-radius: 5px;
+    border-radius: 5px;
+}
+.main-content {
+    padding-top: 12px;
+}
+.side-bar {
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding:1.25em 8px 8px 8px;
+    background-color: rgba(114, 119, 120, 0.9);
+}
+.side-bar__section {
+    border: 1px solid #3fb9ef;
+    padding: 6px 6px;
+    border-radius: 5px;
+    margin-bottom: 0.75em;
+    position: relative;
+}
+.side-bar__headers {
+    font-size: 1.25em !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+.side-bar__headers>span {
+    font-weight: bold;
+    font-style: italic;
+}
+.custom-control {
+    width: 50% !important;
+    display: inline-block !important;
+}
+.side-bar__section-body {
+    padding: 8px 0;
+}
+.main-weather {
+    font-weight: bold;
+    text-decoration: underline;
+}
+.side-bar__info {
+    font-size: 12px;
+    position: absolute;
+    bottom: 25%;
+    right: 0;
+}
+.temperature {
+    font-size: 18px;
+    font-weight: bold;
+}
+#btnAnalyseJourney {
+    width: 100%;
+}
+.weather-widget {
+    display: none;
+}
+.btn-geo {
+    color: lawngreen;
+}
+.btn-geo:hover {
+    color: dodgerblue;
+    font-weight: bold;
+}
+
+.text-danger {
+    background-color: #fff;
+    border-radius: 0 0 5px 5px;
+}
